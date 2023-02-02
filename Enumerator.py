@@ -1,20 +1,37 @@
+### IMPORTS ###
 import sys
 import argparse
 import json
 import requests
-#from python_on_whales import 
 
+### GLOBALS ###
 DOCKER_HUB_API_ENDPOINT = r'https://hub.docker.com/v2/'
-#repo = r"liorf077/testrepo"
+HEADERS = {'Content-type': 'application/json'}
+DIAGESTS = []
+SUSPECTED = []
+
+# Query tags to find the related digests in order to look for cosign signature format
+def query_tag(repo, tag):
+    request_method = getattr(requests, 'get')
+    url = f'{DOCKER_HUB_API_ENDPOINT}repositories/{repo}/tags/{tag}'
+    resp = request_method(url, HEADERS)
+    tag_content = {}
+    if resp.status_code == 200:
+        tag_content = json.loads(resp.content.decode())
+    else:
+        print("There was a problem with the request.")
+        sys.exit(1)
+    digest = tag_content['images'][0]['digest']
+    digest = digest.replace(':','-')
+    digest = digest+".sig"
+    DIAGESTS.append(digest)
 
 # Get all tags in the repository 
 def get_tags(repo):
-    headers = {'Content-type': 'application/json'}
     url = f'{DOCKER_HUB_API_ENDPOINT}repositories/{repo}/tags'
     request_method = getattr(requests, 'get')
-    signature = [] 
-
-    resp = request_method(url, headers)
+    signature = []  
+    resp = request_method(url, HEADERS)
     content = {}
     if resp.status_code == 200:
         content = json.loads(resp.content.decode())
@@ -25,17 +42,12 @@ def get_tags(repo):
     print("Printing Tags in repo {}:".format(repo))
     for tag in content["results"]:
         print("-", tag["name"])
+        SUSPECTED.append(tag["name"])
         # Look for cosign signature - https://github.com/sigstore/cosign/blob/main/specs/SIGNATURE_SPEC.md
-        if (".sig") in tag["name"]:
-            signature.append(tag["name"])
-    # Print the signature found
-    if not signature:
-       print("The image doesn't have cosign signature in the repository") 
-    else:
-        print("The image has cosign signature in the repository:\n {}".format(signature))
+        query_tag(repo, tag["name"])
 
+# Get repository path from user
 def get_arguments():
-    # Get repository path from user
     parser = argparse.ArgumentParser(prog="Image Enumerator")
     parser.add_argument('-r', '--repo')
     args = parser.parse_args()
@@ -48,6 +60,11 @@ def get_arguments():
 def main():
     repo = get_arguments()
     get_tags(repo)
+
+    # Go over the lists of Diagests and tags, and find cosign signature
+    for suspect in SUSPECTED:
+        if suspect in DIAGESTS:
+            print("found cosign signature {}".format(suspect))
 
 if __name__ == '__main__':
     main()
