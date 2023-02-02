@@ -7,7 +7,7 @@ import requests
 ### GLOBALS ###
 DOCKER_HUB_API_ENDPOINT = r'https://hub.docker.com/v2/'
 HEADERS = {'Content-type': 'application/json'}
-DIAGESTS = []
+DIGESTS = []
 SUSPECTED = []
 
 # Query tags to find the related digests in order to look for cosign signature format
@@ -24,7 +24,7 @@ def query_tag(repo, tag):
     digest = tag_content['images'][0]['digest']
     digest = digest.replace(':','-')
     digest = digest+".sig"
-    DIAGESTS.append(digest)
+    DIGESTS.append(digest)
 
 # Get all tags in the repository 
 def get_tags(repo):
@@ -47,7 +47,7 @@ def get_tags(repo):
         query_tag(repo, tag["name"])
 
 # Get repository path from user
-def get_arguments():
+def get_argument():
     parser = argparse.ArgumentParser(prog="Image Enumerator")
     parser.add_argument('-r', '--repo')
     args = parser.parse_args()
@@ -58,12 +58,12 @@ def get_arguments():
     return args.repo
 
 def main():
-    repo = get_arguments()
+    repo = get_argument()
     get_tags(repo)
 
     # Go over the lists of Diagests and tags, and find cosign signature
     for suspect in SUSPECTED:
-        if suspect in DIAGESTS:
+        if suspect in DIGESTS:
             print("found cosign signature {}".format(suspect))
 
 if __name__ == '__main__':
