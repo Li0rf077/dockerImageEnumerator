@@ -5,10 +5,25 @@ import json
 import requests
 
 ### GLOBALS ###
-DOCKER_HUB_API_ENDPOINT = r'https://hub.docker.com/v2/'
+DOCKER_HUB_API_ENDPOINT = r'https://registry.hub.docker.com/v2/'
 HEADERS = {'Content-type': 'application/json'}
-DIGESTS = []
+DIGESTS = []    
 SUSPECTED = []
+U = "username"
+P = "password"
+
+# extract manifest by tag
+def get_manifest(repo, tag):
+    tags_url = f"{DOCKER_HUB_API_ENDPOINT}repositories/{repo}/tags"
+    manifest_url = f"{tags_url}/tag/manifest"
+    headers = {"Accept": "application/vnd.docker.distribution.manifest.v2+json"}
+    resp = requests.get(tags_url, auth=(U, P))
+    if resp.status_code == 200:
+        manifest = json.loads(resp.content.decode())
+        print(" Printing manifest:")
+        print(json.dumps(manifest, indent=2))
+    else:
+        print("There was a problem with the request.")
 
 # Query tags to find the related digests in order to look for cosign signature format
 def query_tag(repo, tag):
@@ -41,7 +56,10 @@ def get_tags(repo):
     # Print all tags
     print("Printing Tags in repo {}:".format(repo))
     for tag in content["results"]:
-        print("-", tag["name"])
+        print("***", tag["name"], "***")
+        
+        get_manifest(repo, tag["name"])
+
         SUSPECTED.append(tag["name"])
         # Look for cosign signature - https://github.com/sigstore/cosign/blob/main/specs/SIGNATURE_SPEC.md
         query_tag(repo, tag["name"])
